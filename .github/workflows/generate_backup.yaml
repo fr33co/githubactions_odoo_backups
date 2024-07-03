@@ -43,9 +43,8 @@ jobs:
             -d "master_pwd=$ODOO_ADMIN_PASSWORD&name=$ODOO_DB_NAME&backup_format=zip" \
             -b "session_id=$SESSION_ID" \
             -o backup-$DATE.zip
-          ls -la
 
-      - name: Run backup script
+      - name: Upload the Odoo backup to Google Drive
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
           GOOGLE_FOLDER : ${{ secrets.GOOGLE_FOLDER_ID }}
