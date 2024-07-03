@@ -1,0 +1,53 @@
+name: Backup Odoo Database and Upload to Google Drive
+
+on:
+  push:
+    branches:
+      - main
+  # schedule:
+  #   - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+  
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
+
+      - name: Download Odoo Database Backup from server
+        env:
+          ODOO_URL: ${{ secrets.ODOO_URL }}
+          ODOO_DB_NAME: ${{ secrets.ODOO_DB_NAME }}
+          ODOO_ADMIN_PASSWORD: ${{ secrets.ODOO_ADMIN_PASSWORD }}
+        run: |
+          DATE=$(date +"%d-%m-%Y")
+          SESSION_ID=$(curl -X POST "$ODOO_URL/web/session/authenticate" \
+            -H "Content-Type: application/json" \
+            -d '{"jsonrpc": "2.0", "params": {"db": "'"$ODOO_DB_NAME"'", "login": "admin", "password": "'"$ODOO_ADMIN_PASSWORD"'", "context": {}}}' \
+            | jq -r '.result.session_id')
+          curl -X POST "$ODOO_URL/web/database/backup" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "master_pwd=$ODOO_ADMIN_PASSWORD&name=$ODOO_DB_NAME&backup_format=zip" \
+            -b "session_id=$SESSION_ID" \
+            -o backup-$DATE.zip
+          ls -la
+
+      - name: Run backup script
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+          GOOGLE_FOLDER : ${{ secrets.GOOGLE_FOLDER_ID }}
+        run: |
+          python upload_to_drive.py
